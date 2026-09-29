@@ -403,7 +403,15 @@ export default function Exam() {
       li: ({ children }) => <li className="flex gap-2"><span className="text-slate-300 dark:text-slate-600 shrink-0">•</span><span>{children}</span></li>,
       ol: ({ children }) => <ol className="text-[14px] text-slate-600 dark:text-slate-300 leading-relaxed space-y-1 mt-2 list-decimal pl-5">{children}</ol>,
       strong: ({ children }) => <strong className="font-semibold text-slate-800 dark:text-slate-100">{children}</strong>,
-      code: ({ children }) => <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono text-[12.5px]">{children}</code>,
+      code: ({ className, children }) => {
+        // 围栏代码块（pre > code.language-*）：不加内边距/背景，样式交给外层 pre，
+        // 否则行内样式叠进块级代码会造成首行缩进和内嵌背景块
+        if (className?.includes('language-')) {
+          return <code className={className}>{children}</code>
+        }
+        // 行内代码：保留标签样式
+        return <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono text-[12.5px]">{children}</code>
+      },
       pre: ({ children }) => <pre className="mt-3 mb-3 bg-slate-50 dark:bg-slate-800 rounded-lg p-3 overflow-x-auto text-[12.5px] leading-relaxed font-mono text-slate-700 dark:text-slate-200 whitespace-pre-wrap">{children}</pre>,
     }}
   >
