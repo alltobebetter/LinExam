@@ -16,12 +16,12 @@
     "validate:problems": "python scripts-local/validate-problems.py",
     "grade": "node scripts/judge/grade.js",
     "build:web": "tsc -b && vite build",
-    "build:electron": "electron-builder",
+    "build:electron": "electron-builder -c electron-builder.config.js",
     "build": "npm run gen:manifest && npm run build:web && npm run build:electron",
     "gen:manifest": "node scripts/gen-problem-manifest.js",
-    "build:win": "npm run gen:manifest && npm run build:web && electron-builder --win",
-    "build:mac": "npm run gen:manifest && npm run build:web && electron-builder --mac",
-    "build:linux": "npm run gen:manifest && npm run build:web && electron-builder --linux"
+    "build:win": "npm run gen:manifest && npm run build:web && electron-builder --win -c electron-builder.config.js",
+    "build:mac": "npm run gen:manifest && npm run build:web && electron-builder --mac -c electron-builder.config.js",
+    "build:linux": "npm run gen:manifest && npm run build:web && electron-builder --linux -c electron-builder.config.js"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
