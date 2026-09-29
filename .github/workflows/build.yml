@@ -1,4 +1,5 @@
 name: Build & Release
+# 由 GitHub Actions 消费：推 v* 标签或手动触发三平台打包
 
 # 触发：推送 v* 标签（正式发版）或手动触发（Actions 页面点按钮）
 # 注意私有仓库分钟数倍率：Linux 1x / Windows 2x / macOS 10x，
