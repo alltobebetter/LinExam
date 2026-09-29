@@ -4,6 +4,11 @@ const fs = require('fs')
 const { startExamMonitoring, stopExamMonitoring, bindWindowEvents } = require('./anticheat')
 const { verifyFetchedProblems } = require('./problems')
 
+// 显式固定用户数据目录（%APPDATA%/linexam）：
+// 引入 productName 后 app.getName() 会变为 "LinExam"，不钉住的话
+// 升级到新版本时考试进度/提交记录的目录会对不上
+app.setPath('userData', path.join(app.getPath('appData'), 'linexam'))
+
 // 考试语言由后端按学生绑定（c/python），登录后确定，不可切换
 const isDev = process.argv.includes('--dev')
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL

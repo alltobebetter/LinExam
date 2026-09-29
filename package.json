@@ -1,5 +1,6 @@
 {
   "name": "linexam",
+  "productName": "LinExam",
   "version": "0.1.0",
   "description": "LinExam - 在线考试平台桌面客户端",
   "main": "src/main/main.js",
