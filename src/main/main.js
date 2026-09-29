@@ -299,7 +299,7 @@ function postCode({ problemId, title, code }) {
 }
 
 ipcMain.handle('code:submit', async (_event, { problemId, code }) => {
-  const problem = problems.find(p => p.id === problemId)
+  const problem = sessionProblems.find(p => p.id === problemId)
   if (!problem) return { error: '题目不存在' }
 
   if (finished) {
