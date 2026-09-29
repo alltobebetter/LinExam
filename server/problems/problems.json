@@ -1,0 +1,6 @@
+{
+  "problems": [
+    { "id": 1, "title": "两数之和", "difficulty": "简单", "author": "LinExam 示例题", "file": "01.md" },
+    { "id": 7, "title": "打印九九乘法表", "difficulty": "简单", "author": "LinExam 示例题", "file": "07.md" }
+  ]
+}

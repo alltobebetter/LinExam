@@ -1,0 +1,48 @@
+{
+  "name": "linexam",
+  "version": "0.1.0",
+  "description": "LinExam - 在线考试平台桌面客户端",
+  "main": "src/main/main.js",
+  "author": "LinExam",
+  "license": "MIT",
+  "scripts": {
+    "dev:web": "vite",
+    "dev:electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 node scripts/dev-electron.js --dev",
+    "predev": "npm run gen:manifest",
+    "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:electron\"",
+    "server": "npm --prefix server run dev",
+    "dev:all": "npm run gen:manifest && concurrently -k \"npm:server\" \"npm:dev\"",
+    "validate:problems": "python scripts-local/validate-problems.py",
+    "grade": "node scripts/judge/grade.js",
+    "build:web": "tsc -b && vite build",
+    "build:electron": "electron-builder",
+    "build": "npm run gen:manifest && npm run build:web && npm run build:electron",
+    "gen:manifest": "node scripts/gen-problem-manifest.js",
+    "build:win": "npm run gen:manifest && npm run build:web && electron-builder --win",
+    "build:mac": "npm run gen:manifest && npm run build:web && electron-builder --mac",
+    "build:linux": "npm run gen:manifest && npm run build:web && electron-builder --linux"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "monaco-editor": "^0.55.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.6.2",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.9.2",
+    "vite": "^6.3.5",
+    "wait-on": "^9.0.10"
+  }
+}

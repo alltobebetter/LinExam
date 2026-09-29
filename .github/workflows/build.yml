@@ -1,0 +1,60 @@
+name: Build & Release
+
+# 触发：推送 v* 标签（正式发版）或手动触发（Actions 页面点按钮）
+# 注意私有仓库分钟数倍率：Linux 1x / Windows 2x / macOS 10x，
+# 一次三平台完整构建约消耗 ~120 分钟额度（免费版 2000 分钟/月）
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:win
+            artifacts: |
+              dist/*.exe
+              dist/*.blockmap
+          - os: macos-latest
+            script: build:mac
+            artifacts: |
+              dist/*.dmg
+              dist/*.zip
+          - os: ubuntu-latest
+            script: build:linux
+            artifacts: |
+              dist/*.AppImage
+              dist/*.deb
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run ${{ matrix.script }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinExam-${{ matrix.os }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+          retention-days: 30

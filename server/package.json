@@ -1,0 +1,22 @@
+{
+  "name": "linexam-server",
+  "version": "0.1.0",
+  "description": "LinExam 极简外部服务 - 登录验证 + 代码收集 + 交卷",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "seed": "tsx src/seed.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.2"
+  }
+}

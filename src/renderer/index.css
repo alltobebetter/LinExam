@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@font-face {
+  font-family: 'ChillRoundF';
+  src: url('/assets/fonts/ChillRoundF/ChillRoundFRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ChillRoundF';
+  src: url('/assets/fonts/ChillRoundF/ChillRoundFBold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  font-family: 'ChillRoundF', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* ── 隐藏原生滚动条（CustomScroll 组件使用） ── */
+.linexam-hide-scroll {
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE 10+ */
+}
+.linexam-hide-scroll::-webkit-scrollbar {
+  display: none;                    /* Chrome / Safari / Electron */
+}
+
+/* ── Toast 进场 ── */
+@keyframes toast-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.toast-enter {
+  animation: toast-enter 0.25s ease-out both;
+}
+
+/* ── Toast 出场 ── */
+@keyframes toast-leave {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+.toast-leave {
+  animation: toast-leave 0.25s ease-in both;
+}
+
+/* ── Modal 遮罩进场 ── */
+@keyframes modal-overlay-enter {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.modal-overlay-enter {
+  animation: modal-overlay-enter 0.2s ease-out both;
+}
+
+/* ── Modal 面板进场 ── */
+@keyframes modal-panel-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.modal-panel-enter {
+  animation: modal-panel-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Modal 遮罩退场 ── */
+@keyframes modal-overlay-leave {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.modal-overlay-leave {
+  animation: modal-overlay-leave 0.2s ease-in both;
+}
+
+/* ── Modal 面板退场 ── */
+@keyframes modal-panel-leave {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+}
+.modal-panel-leave {
+  animation: modal-panel-leave 0.2s ease-in both;
+}
+
+

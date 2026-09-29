@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+release/
+out/
+# build/ 是 electron-builder 的资源目录（图标），只忽略其中的产物，保留图标资产
+build/*
+!build/icon.svg
+!build/icon.png
+!build/icons/
+
+# Vite
+*.local
+
+# TypeScript
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 本地真实题库/判卷用例/校验工具（公开仓库只含示例集，标准解不入库）
+server/problems-local/
+cases-local/
+cases/full.json
+scripts-local/
+src/main/problems/manifest.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Fonts zip
+*.zip
