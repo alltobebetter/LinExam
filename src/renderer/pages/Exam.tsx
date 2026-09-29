@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import Editor, { loader } from '@monaco-editor/react'
 import type { OnMount, BeforeMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
@@ -394,7 +397,8 @@ export default function Exam() {
                 <div className="px-6 py-5">
 {problem ? (
   <ReactMarkdown
-    remarkPlugins={[remarkGfm]}
+    remarkPlugins={[remarkGfm, remarkMath]}
+    rehypePlugins={[rehypeKatex]}
     components={{
       h1: ({ children }) => <h1 className="text-[20px] font-bold text-slate-800 dark:text-slate-100 mb-3">{children}</h1>,
       h2: ({ children }) => <h2 className="text-[16px] font-bold text-slate-800 dark:text-slate-100 mt-5 mb-2">{children}</h2>,
