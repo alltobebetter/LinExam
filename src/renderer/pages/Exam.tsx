@@ -471,6 +471,7 @@ export default function Exam() {
       li: ({ children }) => <li className="flex gap-2"><span className="text-slate-300 dark:text-slate-600 shrink-0">•</span><span>{children}</span></li>,
       ol: ({ children }) => <ol className="text-[14px] text-slate-600 dark:text-slate-300 leading-relaxed space-y-1 mt-2 list-decimal pl-5">{children}</ol>,
       strong: ({ children }) => <strong className="font-semibold text-slate-800 dark:text-slate-100">{children}</strong>,
+      a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-800 dark:hover:text-blue-300">{children}</a>,
       code: ({ className, children }) => {
         // 围栏代码块（pre > code.language-*）：不加内边距/背景，样式交给外层 pre，
         // 否则行内样式叠进块级代码会造成首行缩进和内嵌背景块
