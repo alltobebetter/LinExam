@@ -59,5 +59,7 @@ module.exports = {
     target: ['AppImage', 'deb'],
     icon: 'build/icon.png',
     category: 'Education',
+    // deb 包强制要求 maintainer（AppImage 不需要，所以之前 AppImage 成功、deb 失败）
+    maintainer: 'alltobebetter <alltobebetter@outlook.com>',
   },
 }
