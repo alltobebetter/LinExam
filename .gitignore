@@ -37,6 +37,9 @@ cases/full.json
 scripts-local/
 src/main/problems/manifest.json
 
+# 展示站独立成库（LinExamWeb），不随主仓库推送
+site/
+
 # Python
 __pycache__/
 *.pyc
