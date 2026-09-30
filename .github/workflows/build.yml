@@ -10,6 +10,11 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# electron-builder 在 tag 构建时要创建 Release 并上传安装包，
+# 默认 GITHUB_TOKEN 权限不足（403），必须显式声明
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
