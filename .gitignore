@@ -40,6 +40,13 @@ src/main/problems/manifest.json
 # 展示站独立成库（LinExamWeb），不随主仓库推送
 site/
 
+# 本地安装包产物（走 GitHub Release / R2 分发，勿入库）
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.blockmap
+
 # Python
 __pycache__/
 *.pyc
