@@ -393,7 +393,7 @@ export default function Exam() {
             </div>
             {/* 内容区 - 始终渲染，折叠时淡出 */}
             <div className="flex-1 min-h-0" style={{ opacity: collapsedTop ? 0 : 1, transition: 'opacity 0.2s ease' }}>
-              <CustomScroll className="h-full">
+              <CustomScroll key={problem?.id ?? 'empty'} className="h-full">
                 <div className="px-6 py-5">
 {problem ? (
   <ReactMarkdown
