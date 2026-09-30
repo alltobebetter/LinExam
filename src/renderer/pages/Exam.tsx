@@ -95,8 +95,11 @@ export default function Exam() {
           status: submittedIds.has(Number(p.id)) ? 'done' as const : viewedIds.has(Number(p.id)) ? 'doing' as const : 'todo' as const,
         }))
         setProblemList(mapped)
+        // 恢复上次答题位置：_meta.lastProblemId 必须在本次题表内，否则回退第一题（防后端换题记脏）
+        const lastId = Number(progress._meta?.lastProblemId)
+        const initial = mapped.some(p => p.id === lastId) ? lastId : mapped[0].id
         if (mapped.length > 0) {
-          loadProblem(mapped[0].id)
+          loadProblem(initial)
         }
       } else {
         toast.show('题目列表为空', 'warning')
@@ -142,6 +145,8 @@ export default function Exam() {
       setProblem(p)
       problemRef.current = p
       setBottomTab('problems')
+      // 记录上次位置（白名单校验在主进程内做，失败忽略）
+      window.exampower?.setLastProblemId(id)?.catch(() => {})
       // 标记看过（进行中）
       try {
         await window.exampower?.saveProgress(id, restoredCode, true)

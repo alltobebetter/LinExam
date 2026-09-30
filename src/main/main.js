@@ -21,6 +21,7 @@ let mainWindow = null
 let sessionToken = null
 let sessionLanguage = 'c'
 let sessionProblems = []   // 登录时校验通过的服务端题目（含题面）
+let sessionManifestHash = null // 本场考试指纹（服务端下发，仅作进度命名空间，不作安全判定）
 let finished = false
 let currentStudentId = null  // 当前登录学生，用于 submissions 过滤与补报归属
 
@@ -284,6 +285,7 @@ ipcMain.handle('auth:login', async (_event, { name, studentId, serverUrl: inputU
 
     // ── 题库下发 + 指纹校验（不通过则拒绝进入考试）──
     let fetchedProblems
+    let fetchedManifestHash = null
     try {
       const pResp = await fetch(`${serverUrl}/api/problems`, {
         headers: { Authorization: `Bearer ${data.token}` },
@@ -302,6 +304,7 @@ ipcMain.handle('auth:login', async (_event, { name, studentId, serverUrl: inputU
         return { ok: false, error: verdict.error }
       }
       fetchedProblems = pData.problems
+      fetchedManifestHash = typeof pData.manifestHash === 'string' ? pData.manifestHash : null
     } catch (err) {
       console.error('[题库获取失败]', err)
       return { ok: false, error: '题库获取失败，请检查网络后重试' }
@@ -310,12 +313,13 @@ ipcMain.handle('auth:login', async (_event, { name, studentId, serverUrl: inputU
     sessionToken = data.token
     sessionLanguage = data.language === 'python' ? 'python' : 'c'
     sessionProblems = fetchedProblems
+    sessionManifestHash = fetchedManifestHash
     currentStudentId = data.studentId
 
-    // ── 按学生重置/延续考试状态 ──
-    // 同一学生重新登录（如客户端崩溃重启）：保留代码进度，仅重置计时器；
-    // 换学生登录（如机器流转给下一位考生）：清空上一人的代码/进度/提交记录，避免泄露与串卷。
-    resetExamStateFor(data.studentId)
+    // ── 按学生+考试重置/延续考试状态 ──
+    // 同一学生同一套卷重新登录（如客户端崩溃重启）：保留代码进度，仅重置计时器；
+    // 换学生或换套卷：清空上一份代码/进度/提交记录，避免泄露与串卷。
+    resetExamStateFor(data.studentId, fetchedManifestHash)
 
     // 登录成功后补报旧队列（先补旧）
     try {
@@ -389,16 +393,19 @@ function enqueueProgressUpdate(mutator) {
 }
 
 /**
- * 登录时按学生重置考试状态。
- * - 同一学生：保留代码进度（崩溃恢复），重置考试开始时间；已交卷则本地锁定。
- * - 不同学生（含 _meta 缺失的未知归属）：清空进度与提交记录，计时器归零。
+ * 登录时按学生+考试重置考试状态。
+ * - 同一学生同一套卷：保留代码进度（崩溃恢复），重置考试开始时间；已交卷则本地锁定。
+ * - 不同学生（含 _meta 缺失的未知归属）或不同套卷（examId 不一致）：清空进度与提交记录。
+ * examId 取服务端下发的 manifestHash，仅作命名空间（换卷识别），不作安全判定；
+ * 缺失时做向后兼容：不断言换卷，只沿用旧值，避免升级当场丢草稿。
  */
-function resetExamStateFor(studentId) {
+function resetExamStateFor(studentId, examId) {
   const progress = loadProgress()
   const meta = progress._meta || {}
+  const examChanged = !!(meta.examId && examId && meta.examId !== examId)
 
-  if (!meta.studentId || meta.studentId !== studentId) {
-    // 换人（含归属缺失）：全部清空，并立即写入新学生的归属标记，
+  if (!meta.studentId || meta.studentId !== studentId || examChanged) {
+    // 换人/换卷（含归属缺失）：全部清空，并立即写入新归属标记，
     // 防止「换人做题→重启→第三人登录」时被误判为同一学生而串卷
     try {
       fs.rmSync(path.join(app.getPath('userData'), 'exam-progress.json'), { force: true })
@@ -407,8 +414,10 @@ function resetExamStateFor(studentId) {
       console.error('重置考试状态失败:', err)
     }
     finished = false
-    saveProgress({ _meta: { studentId, startTime: Date.now() } })
-    if (meta.studentId) {
+    saveProgress({ _meta: { studentId, examId: examId || meta.examId, startTime: Date.now() } })
+    if (examChanged) {
+      console.log(`[登录] 检测到换卷（examId 变化），已重置考试状态（→ ${studentId}）`)
+    } else if (meta.studentId) {
       console.log(`[登录] 检测到学生切换（${meta.studentId} → ${studentId}），已重置考试状态`)
     } else {
       console.log(`[登录] 进度无归属标记，按换人处理，已重置考试状态（→ ${studentId}）`)
@@ -416,9 +425,9 @@ function resetExamStateFor(studentId) {
     return
   }
 
-  // 同一学生：保留进度，重置计时器（旧的 startTime 可能属于上一场考试）
+  // 同一学生同一套卷：保留进度，重置计时器（旧的 startTime 可能属于上一场考试）
   finished = !!meta.finished
-  progress._meta = { ...meta, studentId, startTime: Date.now(), finished: finished || undefined }
+  progress._meta = { ...meta, studentId, examId: examId || meta.examId, startTime: Date.now(), finished: finished || undefined }
   saveProgress(progress)
 
   if (finished) {
@@ -539,6 +548,18 @@ ipcMain.handle('progress:save', async (_event, { problemId, code, viewed }) => {
     if (code !== undefined) entry.code = code
     if (viewed !== undefined) entry.viewed = viewed
     progress[problemId] = entry
+  })
+  return { ok: true }
+})
+
+// ── 上次答题题目（仅 _meta.lastProblemId，不含代码；换卷时由 resetExamStateFor 清空）──
+ipcMain.handle('progress:setLast', async (_event, problemId) => {
+  const id = Number(problemId)
+  if (!Number.isFinite(id)) return { ok: false }
+  // 白名单校验：不在本场题内不记，避免后端换题后记脏 ID
+  if (!sessionProblems.some(p => p.id === id)) return { ok: false }
+  await enqueueProgressUpdate((progress) => {
+    progress._meta = { ...(progress._meta || {}), lastProblemId: id }
   })
   return { ok: true }
 })

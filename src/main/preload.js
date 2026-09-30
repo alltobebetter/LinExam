@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('exampower', {
   // ── 考试进度（本地持久化） ──
   saveProgress: (problemId, code, viewed) =>
     ipcRenderer.invoke('progress:save', { problemId, code, viewed }),
+  setLastProblemId: (problemId) =>
+    ipcRenderer.invoke('progress:setLast', problemId),
   getExamStartTime: () => ipcRenderer.invoke('exam:startTime'),
   getProgress: () => ipcRenderer.invoke('progress:get'),
 

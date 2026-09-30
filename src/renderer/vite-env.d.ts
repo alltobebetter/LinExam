@@ -68,10 +68,11 @@ interface Window {
     // 提交记录
     getSubmissions: (problemId?: number) => Promise<SubmissionRecord[]>
 
-    // 考试进度（本地持久化）
+    // 考试进度（本地持久化，_meta 含 studentId/examId/lastProblemId/startTime/finished）
     saveProgress: (problemId: number, code: string, viewed: boolean) => Promise<{ ok: boolean }>
+    setLastProblemId: (problemId: number) => Promise<{ ok: boolean }>
     getExamStartTime: () => Promise<number>
-    getProgress: () => Promise<Record<string, ProblemProgress>>
+    getProgress: () => Promise<Record<string, ProblemProgress> & { _meta?: { lastProblemId?: number; examId?: string; studentId?: string; startTime?: number; finished?: boolean } }>
 
     // 考试语言（登录时由后端绑定，不可切换）
     getLanguage: () => Promise<string>
