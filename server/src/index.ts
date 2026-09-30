@@ -96,13 +96,37 @@ function hitTokenRate(token: string): boolean {
 }
 
 function checkTokenRate(req: express.Request, res: express.Response): boolean {
-  const header = req.headers.authorization || ''
-  const token = header.startsWith('Bearer ') ? header.slice(7) : header
-  if (!hitTokenRate(token || (req as any).user?.studentId || 'unknown')) {
+  const token = getBearer(req) || (req as any).user?.studentId || 'unknown'
+  if (!hitTokenRate(token)) {
     res.status(429).json({ error: '请求过于频繁，请稍后再试' })
     return false
   }
   return true
+}
+
+function getBearer(req: express.Request): string {
+  const header = req.headers.authorization || ''
+  return header.startsWith('Bearer ') ? header.slice(7) : header
+}
+
+// 题目白名单缓存（loadProblems 自带进程缓存，此处再缓存 id Set 避免每次重建）
+let validProblemIds: Set<number> | null = null
+function getValidProblemIds(): Set<number> {
+  if (!validProblemIds) {
+    validProblemIds = new Set(loadProblems().map(p => p.id))
+  }
+  return validProblemIds
+}
+
+// 名单资格校验：仍在允许考试名单才接受上报（submit/finish 共用）
+function requireAllowed(studentId: string): { ok: boolean; error?: string } {
+  const row = db.prepare('SELECT allowed FROM students WHERE id = ?').get(studentId) as
+    | { allowed: number }
+    | undefined
+  if (!row || row.allowed !== 1) {
+    return { ok: false, error: '考试资格已被取消' }
+  }
+  return { ok: true }
 }
 
 // ── 中间件 ──
@@ -141,15 +165,8 @@ app.post('/api/login', (req, res) => {
     'SELECT id, name, allowed, language FROM students WHERE id = ?'
   ).get(trimmedId) as { id: string; name: string; allowed: number; language: string } | undefined
 
-  // 统一文案：不在名单 / 被禁考 / 姓名不匹配一律返回同一错误，避免枚举学号；
-  // 日志只记学号，不记期望姓名，防止敏感信息落盘。
-  if (!student || student.allowed !== 1) {
-    recordLoginFailure(rateKey)
-    console.error(`[登录失败] 学号 ${trimmedId} 登录失败`)
-    return res.status(403).json({ error: '姓名与学号不匹配，请核对后重试' })
-  }
-
-  if (student.name !== trimmedName) {
+  // 统一文案防枚举：不在名单 / 被禁考 / 姓名不匹配一律同错；日志只记学号
+  if (!student || student.allowed !== 1 || student.name !== trimmedName) {
     recordLoginFailure(rateKey)
     console.error(`[登录失败] 学号 ${trimmedId} 登录失败`)
     return res.status(403).json({ error: '姓名与学号不匹配，请核对后重试' })
@@ -206,17 +223,15 @@ app.post('/api/submit', (req, res) => {
     return res.status(400).json({ error: '提交数据不完整' })
   }
 
-  // 题目必须在服务端白名单内（防伪造 problemId 灌库）
+  // 题目必须在服务端白名单内（loadProblems 自带缓存，不必每次重建 Set）
   const pid = Number(problemId)
-  let validIds: Set<number>
   try {
-    validIds = new Set(loadProblems().map(p => p.id))
+    if (!Number.isInteger(pid) || !getValidProblemIds().has(pid)) {
+      return res.status(400).json({ error: '题目不存在' })
+    }
   } catch (err) {
     console.error('[提交] 题库加载失败:', err)
     return res.status(500).json({ error: '服务异常，请稍后重试' })
-  }
-  if (!Number.isInteger(pid) || !validIds.has(pid)) {
-    return res.status(400).json({ error: '题目不存在' })
   }
 
   // 代码长度上限 200KB（防超大 body 灌爆磁盘）
@@ -227,11 +242,8 @@ app.post('/api/submit', (req, res) => {
   // 标题截断 100 字
   const safeTitle = typeof title === 'string' ? title.slice(0, 100) : null
 
-  // 名单有效性：学生仍允许考试才接受上报
-  const student = db.prepare('SELECT allowed FROM students WHERE id = ?').get(user.studentId) as
-    | { allowed: number }
-    | undefined
-  if (!student || student.allowed !== 1) {
+  const allowed = requireAllowed(user.studentId)
+  if (!allowed.ok) {
     return res.status(403).json({ error: '考试资格已被取消，无法提交' })
   }
 
@@ -269,15 +281,11 @@ app.post('/api/submit', (req, res) => {
   res.json({ ok: true })
 })
 
-// ── 交卷 ──
 // 交卷兜底上报（幂等，每生一条）。
 app.post('/api/finish', (req, res) => {
   const user = (req as any).user
-  // 与 /api/submit 对齐：被取消资格的学生不能交卷
-  const student = db.prepare('SELECT allowed FROM students WHERE id = ?').get(user.studentId) as
-    | { allowed: number }
-    | undefined
-  if (!student || student.allowed !== 1) {
+  const allowed = requireAllowed(user.studentId)
+  if (!allowed.ok) {
     return res.status(403).json({ error: '考试资格已被取消，无法交卷' })
   }
 

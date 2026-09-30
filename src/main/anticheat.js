@@ -1,15 +1,22 @@
 const { powerMonitor } = require('electron')
 
-// 切屏判定的最短离焦时长（毫秒）：输入法切换、通知弹窗、截图等瞬时分焦不误报，
-// 只有真正离开窗口超过阈值的才算一次切屏（业界监考类软件的通行做法）。
+// 切屏阈值：瞬时分焦（输入法/通知）不计，离焦超 1s 才算切屏
 const MIN_FOCUS_LOSS_MS = 1000
 
-// ── 考试行为记录 ──
 let examRecord = null
 let focusLossCount = 0
 let isMonitoring = false
-let blurTime = 0   // 当前离焦开始时间（0 = 未离焦）
-let powerMonitorBound = false  // 全局guard：防止重复绑定powerMonitor
+let blurTime = 0
+let powerMonitorBound = false
+
+function active() {
+  return isMonitoring && examRecord
+}
+
+function recordViolation(type, message) {
+  if (!active()) return
+  examRecord.violations.push({ time: Date.now(), type, message })
+}
 
 /**
  * 初始化考试行为记录
@@ -51,16 +58,15 @@ function stopExamMonitoring() {
  * 绑定窗口事件（在 createWindow 后调用）
  */
 function bindWindowEvents(mainWindow) {
-  // 窗口失焦：只记录时间，不计次（结算统一在 focus 处，避免一次离席记两次）
+  // 失焦只记时间，结算统一在 focus，避免一次离席记两次
   mainWindow.on('blur', () => {
-    if (!isMonitoring || !examRecord) return
-    if (blurTime > 0) return
+    if (!active() || blurTime > 0) return
     blurTime = Date.now()
   })
 
-  // 窗口获焦：离焦时长超过阈值才计为一次切屏
+  // 获焦时按离焦时长判定切屏
   mainWindow.on('focus', () => {
-    if (!isMonitoring || !examRecord) return
+    if (!active()) return
     if (blurTime > 0) {
       const duration = Date.now() - blurTime
       blurTime = 0
@@ -75,26 +81,11 @@ function bindWindowEvents(mainWindow) {
     }
   })
 
-  // 系统级：电源事件（睡眠/唤醒），全局只绑一次
+  // 电源事件全局只绑一次
   if (!powerMonitorBound) {
     powerMonitorBound = true
-    powerMonitor.on('resume', () => {
-      if (!isMonitoring || !examRecord) return
-      examRecord.violations.push({
-        time: Date.now(),
-        type: 'system_resume',
-        message: '系统从睡眠中恢复',
-      })
-    })
-
-    powerMonitor.on('suspend', () => {
-      if (!isMonitoring || !examRecord) return
-      examRecord.violations.push({
-        time: Date.now(),
-        type: 'system_suspend',
-        message: '系统进入睡眠',
-      })
-    })
+    powerMonitor.on('resume', () => recordViolation('system_resume', '系统从睡眠中恢复'))
+    powerMonitor.on('suspend', () => recordViolation('system_suspend', '系统进入睡眠'))
   }
 }
 

@@ -4,36 +4,16 @@ import { useTheme } from './ThemeProvider'
 interface CustomScrollProps {
   children: ReactNode
   className?: string
-  /** thumb 颜色，默认 slate-300 */
-  thumbColor?: string
-  /** thumb hover 颜色，默认 slate-400 */
-  thumbHoverColor?: string
-  /** thumb 宽度 px，默认 6 */
-  thumbWidth?: number
-  /** 自动隐藏：hover/scroll 时显示，空闲后淡出 */
-  autoHide?: boolean
-  /** 隐藏延迟 ms */
-  hideDelay?: number
 }
 
-/**
- * 自定义滚动条组件
- *
- * 可见性状态机（参考 OverlayScrollbars 的 `leave` 模式）：
- * - 可见条件：鼠标在容器内 (hovering) OR 正在滚动 OR 正在拖拽
- * - 隐藏条件：以上都不满足，经过 hideDelay 后淡出
- *
- * 所有可能被定时器读取的状态都用 ref，避免闭包捕获旧值。
- */
+/** 自定义滚动条：hover/滚动/拖拽时显示，空闲后淡出（定时器读 ref 防闭包旧值） */
 export default function CustomScroll({
   children,
   className = '',
-  thumbColor = undefined,
-  thumbHoverColor = undefined,
-  thumbWidth = 6,
-  autoHide = true,
-  hideDelay = 800,
 }: CustomScrollProps) {
+  const thumbWidth = 6
+  const autoHide = true
+  const hideDelay = 800
   const scrollRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
@@ -51,9 +31,9 @@ export default function CustomScroll({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 根据主题动态计算颜色
-  const resolvedThumbColor = thumbColor ?? (isDark ? 'rgb(71 85 105)' : 'rgb(203 213 225)')
-  const resolvedThumbHoverColor = thumbHoverColor ?? (isDark ? 'rgb(100 116 139)' : 'rgb(148 163 184)')
+  // 根据主题动态计算颜色（调用方无定制需求，默认值内聚在此）
+  const resolvedThumbColor = isDark ? 'rgb(71 85 105)' : 'rgb(203 213 225)'
+  const resolvedThumbHoverColor = isDark ? 'rgb(100 116 139)' : 'rgb(148 163 184)'
 
   // 拖拽起始信息
   const dragStart = useRef({ startY: 0, startScrollTop: 0 })
@@ -204,12 +184,11 @@ export default function CustomScroll({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* 可滚动内容区 —— 隐藏原生滚动条 */}
+      {/* 可滚动内容区 —— 隐藏原生滚动条（样式见 index.css .linexam-hide-scroll） */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex-grow min-h-0 w-full overflow-y-auto linexam-hide-scroll"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {children}
       </div>

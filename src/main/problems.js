@@ -52,26 +52,19 @@ function verifyFetchedProblems(fetched) {
     return { ok: false, error: '客户端题库清单缺失，请联系监考老师' }
   }
 
-  // 1. 题量与题号必须与清单完全一致（多一题少一题都算被篡改）
-  const fetchedIds = new Set(fetched.map(p => p.id))
+  // 题量与题号必须与清单完全一致
+  if (fetched.length !== manifest.size) {
+    return { ok: false, error: '题目数量与考试清单不符，请检查服务器地址是否正确' }
+  }
   for (const p of fetched) {
     if (!manifest.has(p.id)) {
       return { ok: false, error: `题目#${p.id}不在本场考试清单中，请检查服务器地址是否正确` }
     }
   }
-  for (const id of manifest.keys()) {
-    if (!fetchedIds.has(id)) {
-      return { ok: false, error: `题目#${id}缺失，请检查服务器地址是否正确` }
-    }
-  }
 
-  // 2. 逐题用收到的内容重算指纹，与清单比对；服务端自报 hash 若有也顺带核对一致性
+  // 逐题用收到的内容重算指纹与清单比对（不信任服务端自报 hash）
   for (const p of fetched) {
-    const local = recomputeHash(p)
-    if (typeof p.hash === 'string' && p.hash !== local) {
-      return { ok: false, error: `题目#${p.id}指纹异常，请检查服务器地址是否正确` }
-    }
-    if (local !== manifest.get(p.id)) {
+    if (recomputeHash(p) !== manifest.get(p.id)) {
       return { ok: false, error: `题目#${p.id}内容与考试清单不符，请检查服务器地址是否正确` }
     }
   }

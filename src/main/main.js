@@ -21,7 +21,7 @@ let mainWindow = null
 let sessionToken = null
 let sessionLanguage = 'c'
 let sessionProblems = []   // 登录时校验通过的服务端题目（含题面）
-let sessionManifestHash = null // 本场考试指纹（服务端下发，仅作进度命名空间，不作安全判定）
+let sessionExamId = null // 本场考试指纹（manifestHash，仅作进度命名空间）
 let finished = false
 let currentStudentId = null  // 当前登录学生，用于 submissions 过滤与补报归属
 
@@ -106,16 +106,13 @@ ipcMain.handle('window:isMaximized', () => {
 })
 
 /**
- * 归一化并校验用户输入的服务器地址。
- * 只接受 http/https 的“根地址”，拒绝带 userinfo/path/query/fragment 的输入，
- * 提示用户“只需填写 http://IP:端口”。
- * 未写协议时自动补 http://（注意：明文 http 有嗅探风险，仅限内网机房使用）。
+ * 归一化并校验用户输入的服务器地址：只接受 http/https 根地址，
+ * 未写协议自动补 http（明文有嗅探风险，仅限内网机房）。
  */
 function normalizeServerUrl(input) {
   if (!input || typeof input !== 'string') return null
   const trimmed = input.trim()
   if (!trimmed) return null
-  // 注意：自动补 http 仅为方便内网输入，明文传输有被嗅探风险
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
   try {
     const url = new URL(withScheme)
@@ -194,18 +191,21 @@ function queuePendingFinish(entry) {
  */
 async function flushPendingFinish(token) {
   // 合并 legacy pending-behavior.json（关窗快照）：转为 needsFinish=false 条目后删除旧文件
+  // TODO(迁移窗后删除)：老版本升级一次性合并，新安装不会产生该文件
   try {
-    const legacy = JSON.parse(fs.readFileSync(pendingBehaviorFile(), 'utf-8'))
-    const arr = Array.isArray(legacy) ? legacy : [legacy]
-    const cur = loadPendingFinish()
-    let changed = false
-    for (const s of arr) {
-      if (!s || typeof s !== 'object') continue
-      cur.push({ studentId: s.studentId || currentStudentId, time: new Date().toISOString(), summary: s.summary || s, needsFinish: false })
-      changed = true
+    const legacy = loadJson(pendingBehaviorFile(), null)
+    if (legacy) {
+      const arr = Array.isArray(legacy) ? legacy : [legacy]
+      const cur = loadPendingFinish()
+      let changed = false
+      for (const s of arr) {
+        if (!s || typeof s !== 'object') continue
+        cur.push({ studentId: s.studentId || currentStudentId, time: new Date().toISOString(), summary: s.summary || s, needsFinish: false })
+        changed = true
+      }
+      if (changed) savePendingFinish(cur)
+      fs.rmSync(pendingBehaviorFile(), { force: true })
     }
-    if (changed) savePendingFinish(cur)
-    fs.rmSync(pendingBehaviorFile(), { force: true })
   } catch { /* 无旧文件则忽略 */ }
   const queue = loadPendingFinish()
   if (!queue.length || !token) return
@@ -214,35 +214,14 @@ async function flushPendingFinish(token) {
     const summary = item.summary || item
     const needsFinish = item.needsFinish !== false
     try {
-      let finishOk = true
       if (needsFinish) {
-        const fResp = await fetch(`${serverUrl}/api/finish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(10000),
-        })
-        finishOk = fResp.ok || fResp.status === 403
+        const fResp = await postFinish(token)
         if (fResp.status === 401) { remain.push(item); continue }
-        if (!finishOk) { remain.push(item); continue }
+        if (!(fResp.ok || fResp.status === 403)) { remain.push(item); continue }
       }
-      const resp = await fetch(`${serverUrl}/api/behavior`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          focusLossCount: summary.focusLossCount || 0,
-          violations: summary.violations || [],
-          duration: summary.duration || 0,
-          level: summary.level || 'normal',
-        }),
-        signal: AbortSignal.timeout(10000),
-      })
+      const resp = await postBehavior(token, summary)
       if (!resp.ok) {
-        // behavior 失败则保留（含 finish 已补的情况，下次重放 finish 幂等）
-        remain.push(item)
-      } else if (!finishOk) {
+        // behavior 失败则保留（下次重放 finish 幂等）
         remain.push(item)
       }
     } catch (err) {
@@ -285,7 +264,7 @@ ipcMain.handle('auth:login', async (_event, { name, studentId, serverUrl: inputU
 
     // ── 题库下发 + 指纹校验（不通过则拒绝进入考试）──
     let fetchedProblems
-    let fetchedManifestHash = null
+    let fetchedExamId = null
     try {
       const pResp = await fetch(`${serverUrl}/api/problems`, {
         headers: { Authorization: `Bearer ${data.token}` },
@@ -304,7 +283,7 @@ ipcMain.handle('auth:login', async (_event, { name, studentId, serverUrl: inputU
         return { ok: false, error: verdict.error }
       }
       fetchedProblems = pData.problems
-      fetchedManifestHash = typeof pData.manifestHash === 'string' ? pData.manifestHash : null
+      fetchedExamId = typeof pData.manifestHash === 'string' ? pData.manifestHash : null
     } catch (err) {
       console.error('[题库获取失败]', err)
       return { ok: false, error: '题库获取失败，请检查网络后重试' }
@@ -313,13 +292,13 @@ ipcMain.handle('auth:login', async (_event, { name, studentId, serverUrl: inputU
     sessionToken = data.token
     sessionLanguage = data.language === 'python' ? 'python' : 'c'
     sessionProblems = fetchedProblems
-    sessionManifestHash = fetchedManifestHash
+    sessionExamId = fetchedExamId
     currentStudentId = data.studentId
 
     // ── 按学生+考试重置/延续考试状态 ──
     // 同一学生同一套卷重新登录（如客户端崩溃重启）：保留代码进度，仅重置计时器；
     // 换学生或换套卷：清空上一份代码/进度/提交记录，避免泄露与串卷。
-    resetExamStateFor(data.studentId, fetchedManifestHash)
+    resetExamStateFor(data.studentId, fetchedExamId)
 
     // 登录成功后补报旧队列（先补旧）
     try {
@@ -359,16 +338,17 @@ ipcMain.handle('problem:get', (_event, problemId) => {
   }
 })
 
-// ── 考试进度持久化（每题代码/是否看过）──
-// 统一存 userData/exam-progress.json，key = problemId；
-// _meta.studentId 记录进度归属，换人登录时整份重置。
-function loadProgress() {
+// 考试进度持久化：userData/exam-progress.json，key = problemId，_meta 记录归属/考试/计时
+function loadJson(file, fallback) {
   try {
-    const file = path.join(app.getPath('userData'), 'exam-progress.json')
-    return JSON.parse(fs.readFileSync(file, 'utf-8')) || {}
+    return JSON.parse(fs.readFileSync(file, 'utf-8')) || fallback
   } catch {
-    return {}
+    return fallback
   }
+}
+
+function loadProgress() {
+  return loadJson(path.join(app.getPath('userData'), 'exam-progress.json'), {})
 }
 
 function saveProgress(progress) {
@@ -436,34 +416,52 @@ function resetExamStateFor(studentId, examId) {
   }
 }
 
-// ── 代码提交 IPC（纯提交：不判题，只上报代码，考后统一判卷）──
+// 代码提交记录：userData/submissions.json（上报成功才落库）
 function loadSubmissions() {
-  try {
-    const file = path.join(app.getPath('userData'), 'submissions.json')
-    return JSON.parse(fs.readFileSync(file, 'utf-8'))
-  } catch {
-    return []
-  }
+  const v = loadJson(path.join(app.getPath('userData'), 'submissions.json'), [])
+  return Array.isArray(v) ? v : []
 }
 
 function saveSubmissions(list) {
   try {
-    const file = path.join(app.getPath('userData'), 'submissions.json')
-    atomicWriteJson(file, list)
+    atomicWriteJson(path.join(app.getPath('userData'), 'submissions.json'), list)
   } catch (err) {
     console.error('保存提交记录失败:', err)
   }
+}
+
+function authHeaders(token) {
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
 }
 
 function postCode({ problemId, title, code }) {
   if (!sessionToken) return
   return fetch(`${serverUrl}/api/submit`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${sessionToken}`,
-    },
+    headers: authHeaders(sessionToken),
     body: JSON.stringify({ problemId, title, code }),
+    signal: AbortSignal.timeout(10000),
+  })
+}
+
+function postFinish(token) {
+  return fetch(`${serverUrl}/api/finish`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    signal: AbortSignal.timeout(10000),
+  })
+}
+
+function postBehavior(token, summary) {
+  return fetch(`${serverUrl}/api/behavior`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      focusLossCount: summary.focusLossCount || 0,
+      violations: summary.violations || [],
+      duration: summary.duration || 0,
+      level: summary.level || 'normal',
+    }),
     signal: AbortSignal.timeout(10000),
   })
 }
@@ -586,9 +584,7 @@ ipcMain.handle('exam:startTime', () => {
   return startTime
 })
 
-// ── 交卷 IPC（上报交卷 + 防作弊数据）──
-// 只有服务端确认 uploaded 才落盘 finished=true；失败则 summary 入 pending-finish.json 队列，
-// 下次 login 成功或下次 finish 时先补旧再继续；失败的 snapshot 不丢（已存文件）。
+// 交卷：只有服务端确认 uploaded 才落盘 finished；失败入 pending-finish 队列下次补报
 ipcMain.handle('exam:finish', async () => {
   const summary = stopExamMonitoring() || { focusLossCount: 0, violations: [] }
 
@@ -607,28 +603,8 @@ ipcMain.handle('exam:finish', async () => {
     try {
       // 并发：交卷 + 防作弊数据上报
       const [finishResp, behaviorResp] = await Promise.all([
-        fetch(`${serverUrl}/api/finish`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${sessionToken}`,
-          },
-          signal: AbortSignal.timeout(10000),
-        }),
-        fetch(`${serverUrl}/api/behavior`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${sessionToken}`,
-          },
-          body: JSON.stringify({
-            focusLossCount: summary.focusLossCount || 0,
-            violations: summary.violations || [],
-            duration: summary.duration || 0,
-            level: summary.level || 'normal',
-          }),
-          signal: AbortSignal.timeout(10000),
-        }),
+        postFinish(sessionToken),
+        postBehavior(sessionToken, summary),
       ])
       if (finishResp.status === 401 || behaviorResp.status === 401) {
         expired = true

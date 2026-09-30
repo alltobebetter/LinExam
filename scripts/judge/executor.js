@@ -20,19 +20,12 @@ const LANG_CONFIG = {
   },
 }
 
-// ── 跨平台查找可执行文件 ──
+// 跨平台查找可执行文件（win32: where，其余: which）
 function findExecutable(name) {
+  const cmd = process.platform === 'win32' ? 'where' : 'which'
   try {
-    if (process.platform === 'win32') {
-      // Windows: where 命令
-      const result = execFileSync('where', [name], { encoding: 'utf-8', timeout: 3000 })
-      const lines = result.trim().split('\n')
-      return lines[0]?.trim() || null
-    } else {
-      // Unix-like (macOS/Linux): which 命令
-      const result = execFileSync('which', [name], { encoding: 'utf-8', timeout: 3000 })
-      return result.trim().split('\n')[0]?.trim() || null
-    }
+    const result = execFileSync(cmd, [name], { encoding: 'utf-8', timeout: 3000 })
+    return result.trim().split('\n')[0]?.trim() || null
   } catch {
     return null
   }

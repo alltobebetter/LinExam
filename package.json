@@ -12,7 +12,7 @@
     "predev": "npm run gen:manifest",
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:electron\"",
     "server": "npm --prefix server run dev",
-    "dev:all": "npm run gen:manifest && concurrently -k \"npm:server\" \"npm:dev\"",
+    "dev:all": "concurrently -k \"npm:server\" \"npm:dev\"",
     "validate:problems": "python scripts-local/validate-problems.py",
     "grade": "node scripts/judge/grade.js",
     "build:web": "tsc -b && vite build",

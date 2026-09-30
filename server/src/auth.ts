@@ -60,7 +60,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   next()
 }
 
-/** 每小时清理过期会话（幂等，global guard 防重复启动） */
+/** 每小时清理过期会话（幂等，global guard 防重复启动；仅由 index.ts 调用） */
 export function startSweep(): void {
   const g = globalThis as unknown as { __linexam_session_sweep?: unknown }
   if (g.__linexam_session_sweep) return
@@ -75,6 +75,3 @@ export function startSweep(): void {
   if (typeof t.unref === 'function') t.unref()
   g.__linexam_session_sweep = timer
 }
-
-// 模块加载时自启动一次（index.ts 也可显式调用 startSweep，guard 保证只启动一个）
-startSweep()

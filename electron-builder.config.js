@@ -60,11 +60,4 @@ module.exports = {
     icon: 'build/icon.png',
     category: 'Education',
   },
-
-  // 后续发布到 GitHub Releases 时启用
-  // publish: {
-  //   provider: 'github',
-  //   owner: 'YOUR_GITHUB_USERNAME',
-  //   repo: 'LinExam',
-  // },
 }

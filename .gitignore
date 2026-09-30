@@ -9,6 +9,7 @@ out/
 build/*
 !build/icon.svg
 !build/icon.png
+!build/icon-mac.png
 !build/icons/
 
 # Vite
@@ -35,6 +36,10 @@ cases-local/
 cases/full.json
 scripts-local/
 src/main/problems/manifest.json
+
+# Python
+__pycache__/
+*.pyc
 
 # Logs
 logs/

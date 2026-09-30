@@ -6,7 +6,7 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import Editor, { loader } from '@monaco-editor/react'
-import type { OnMount, BeforeMount } from '@monaco-editor/react'
+import type { BeforeMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import CustomScroll from '../components/CustomScroll'
 import Modal from '../components/Modal'
@@ -16,6 +16,13 @@ import { useToast } from '../components/Toast'
 
 // 配置 Monaco 从本地加载，不走 CDN
 loader.config({ monaco })
+
+function formatElapsed(totalSeconds: number): string {
+  const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
+  const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0')
+  const s = String(totalSeconds % 60).padStart(2, '0')
+  return `${h}:${m}:${s}`
+}
 
 const languageLabels: Record<string, string> = { c: 'C', python: 'Python' }
 
@@ -34,6 +41,7 @@ const difficultyStyles = {
 
 export default function Exam() {
   const navigate = useNavigate()
+  const SUBMIT_FAILED = '提交失败，请重试'
   // 考试语言由登录时后端绑定，不可切换
   const [language, setLanguage] = useState('c')
   const [code, setCode] = useState('')
@@ -49,13 +57,25 @@ export default function Exam() {
   const [problem, setProblem] = useState<ProblemDetail | null>(null)
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([])
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const loadSeqRef = useRef(0)
   const codeRef = useRef('')
   const problemRef = useRef<ProblemDetail | null>(null)
   const monacoLang = language === 'c' ? 'cpp' : language
   const { theme } = useTheme()
   const toast = useToast()
+
+  const busy = submitting || finishing
+  function guardBusy(): boolean {
+    if (busy) {
+      toast.show('提交中请稍候', 'warning')
+      return true
+    }
+    return false
+  }
+  function handleAuthExpired(message = '登录已过期，请重新登录'): void {
+    toast.show(message, 'error')
+    navigate('/')
+  }
 
   // 已用时间计时器（不限制时长，仅统计参考）
   // 开始时间持久化到主进程，刷新不丢；用时间戳计算更准
@@ -167,9 +187,9 @@ export default function Exam() {
     return () => clearTimeout(timer)
   }, [code, problem])
 
-  const handleBeforeMount: BeforeMount = (monaco) => {
+  const handleBeforeMount: BeforeMount = (monacoInstance) => {
     // 自定义亮色主题：背景与白色卡片一致
-    monaco.editor.defineTheme('linexam-light', {
+    monacoInstance.editor.defineTheme('linexam-light', {
       base: 'vs',
       inherit: true,
       rules: [],
@@ -178,7 +198,7 @@ export default function Exam() {
       },
     })
     // 自定义暗色主题：背景与 slate-900 卡片一致 (#0f172a)
-    monaco.editor.defineTheme('linexam-dark', {
+    monacoInstance.editor.defineTheme('linexam-dark', {
       base: 'vs-dark',
       inherit: true,
       rules: [],
@@ -186,10 +206,6 @@ export default function Exam() {
         'editor.background': '#0f172a',
       },
     })
-  }
-
-  const handleMount: OnMount = (editor) => {
-    editorRef.current = editor
   }
 
   async function handleSubmit() {
@@ -200,19 +216,15 @@ export default function Exam() {
       toast.show('请先编写代码', 'warning')
       return
     }
-    if (submitting || finishing) {
-      toast.show('提交中请稍候', 'warning')
-      return
-    }
+    if (guardBusy()) return
     setSubmitting(true)
     try {
       const response = await window.exampower?.submitCode(pid, snapshotCode)
       if (pid !== problemRef.current?.id) return
       if (!response) {
-        toast.show('提交失败，请重试', 'error')
+        toast.show(SUBMIT_FAILED, 'error')
       } else if ((response as { code?: number }).code === 401) {
-        toast.show('登录已过期，请重新登录', 'error')
-        navigate('/')
+        handleAuthExpired()
       } else if (response.error) {
         toast.show(response.error, 'error')
       } else {
@@ -225,18 +237,15 @@ export default function Exam() {
         setProblemList(prev => prev.map(p => p.id === pid ? { ...p, status: 'done' as const } : p))
       }
     } catch {
-      toast.show('提交失败，请重试', 'error')
+      toast.show(SUBMIT_FAILED, 'error')
     } finally {
       setSubmitting(false)
     }
   }
 
-  // ── 交卷（兜底上报 + 防作弊上报，交卷后锁定不可再作答）──
+  // 交卷（兜底上报 + 防作弊上报，交卷后锁定不可再作答）
   const handleFinish = async () => {
-    if (finishing || submitting) {
-      toast.show('交卷中请稍候', 'warning')
-      return
-    }
+    if (guardBusy()) return
     setShowFinishConfirm(false)
     setFinishing(true)
     try {
@@ -246,10 +255,9 @@ export default function Exam() {
         // 交卷后锁定：回到登录页
         setTimeout(() => navigate('/'), 800)
       } else if ((result as { code?: number })?.code === 401) {
-        toast.show('登录已过期，请重新登录', 'error')
-        navigate('/')
+        handleAuthExpired()
       } else {
-        toast.show('交卷上报失败，请重试', 'error')
+        toast.show('交卷失败，请重试', 'error')
       }
     } catch {
       toast.show('交卷失败，请重试', 'error')
@@ -326,18 +334,13 @@ export default function Exam() {
               <path d="M12 6v6l4 2" />
             </svg>
             <span className="text-[14px] font-medium text-slate-600 dark:text-slate-300 tabular-nums">
-              {String(Math.floor(elapsed / 3600)).padStart(2, '0')}:
-              {String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0')}:
-              {String(elapsed % 60).padStart(2, '0')}
+              {formatElapsed(elapsed)}
             </span>
           </div>
           {/* 次要：切题导航（quiet tertiary，不与提交竞争） */}
           <button
             onClick={() => {
-              if (submitting || finishing) {
-                toast.show('提交中请稍候', 'warning')
-                return
-              }
+              if (guardBusy()) return
               const currentIdx = problemList.findIndex(p => p.id === problem?.id)
               if (currentIdx < problemList.length - 1) {
                 loadProblem(problemList[currentIdx + 1].id)
@@ -549,10 +552,7 @@ export default function Exam() {
                         <div
                           key={p.id}
                           onClick={() => {
-                            if (submitting || finishing) {
-                              toast.show('提交中请稍候', 'warning')
-                              return
-                            }
+                            if (guardBusy()) return
                             loadProblem(p.id)
                           }}
                           className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
@@ -628,7 +628,6 @@ export default function Exam() {
                 language={monacoLang}
                 value={code}
                 onChange={(v) => { const nv = v || ''; setCode(nv); codeRef.current = nv }}
-                onMount={handleMount}
                 beforeMount={handleBeforeMount}
                 theme={theme === 'dark' ? 'linexam-dark' : 'linexam-light'}
                 loading={<div className="flex items-center justify-center h-full text-[13px] text-slate-400 dark:text-slate-500">加载编辑器…</div>}

@@ -3,15 +3,12 @@ const fs = require('fs')
 const path = require('path')
 const { executeCode } = require('./executor')
 
-// ── 考后统一判卷 ──
-// 读取服务端 SQLite 中的 submissions（status=pending），
-// 每生每题只取【最后一次提交】判卷（计分口径：最后一次为准，与多数课堂 OJ 一致，
-// 绝不把多次提交分数累加），用 cases/full.json 的全部用例逐个运行，
-// 比对输出后回写 score/passed/total/status；被覆盖的旧提交标记为 superseded。
+// 考后统一判卷：读取 submissions（status=pending），每生每题只取最后一次判卷
+// （绝不累加多次提交），用 cases-local/full.json（本地，不入库）> cases/full.example.json
+// 的全部用例逐个运行，回写 score/passed/total/status；被覆盖的旧待判标 superseded。
 //
-// 用法：
-//   node scripts/judge/grade.js [dbPath] [casesPath]
-//   默认 dbPath=server/data/linexam.db，casesPath=cases/full.json
+// 用法：node scripts/judge/grade.js [dbPath] [casesPath]
+//   默认 dbPath=server/data/linexam.db，casesPath 按上述回落自动选择
 
 const dbPath = path.resolve(process.argv[2] || path.join(__dirname, '../../server/data/linexam.db'))
 const casesPath = path.resolve(

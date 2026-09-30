@@ -22,13 +22,11 @@ function IconInput({
   onChange,
   label,
   icon,
-  type = 'text',
 }: {
   value: string
   onChange: (v: string) => void
   label: string
   icon: React.ReactNode
-  type?: string
 }) {
   const [focused, setFocused] = useState(false)
   const active = focused || value.length > 0
@@ -57,7 +55,7 @@ function IconInput({
 
       {/* 输入框 */}
       <input
-        type={type}
+        type="text"
         value={value}
         autoComplete="off"
         onChange={(e) => onChange(e.target.value)}
@@ -150,13 +148,10 @@ export default function Login() {
         localStorage.setItem(SERVER_URL_KEY, serverUrl.trim())
       } catch { /* 忽略存储失败 */ }
 
-      // 启动防作弊监控
+      // 启动防作弊监控（失败则阻断进场，避免无监控考试）
       try {
         const mon = await window.exampower?.startMonitoring(studentId.trim(), name.trim())
-        if (!mon?.ok) {
-          toast.show('启动监控失败，请重试', 'error')
-          return
-        }
+        if (!mon?.ok) throw new Error('monitor')
       } catch {
         toast.show('启动监控失败，请重试', 'error')
         return
