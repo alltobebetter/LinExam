@@ -9,7 +9,10 @@ const os = require('os')
 const LANG_CONFIG = {
   c: {
     fileName: 'solution.c',
-    compileArgs: (compiler) => [compiler, 'solution.c', '-o', 'solution', '-lm'],
+    compileArgs: (compiler) => {
+      const exe = process.platform === 'win32' ? 'solution.exe' : 'solution'
+      return [compiler, '-O2', '-std=c11', '-Wall', '-o', exe, 'solution.c', '-lm']
+    },
   },
   python: {
     fileName: 'solution.py',
@@ -60,6 +63,15 @@ function detectCompilers() {
 // ── 执行单个命令（带超时）──
 // 统一用手动 setTimeout 超时：Windows 下 taskkill /t 可杀整个进程树，
 // 比 execFile 自带的 timeout（仅 SIGTERM 主进程）更可靠，故不再传 timeout 选项。
+// 输出截断：maxBuffer 仍 1MB 防爆内存，但 stdout 超 256KB 则截断返回（truncated 标志）
+const MAX_OUTPUT = 256 * 1024
+
+function truncOutput(s) {
+  if (typeof s !== 'string') return { text: s || '', truncated: false }
+  if (s.length > MAX_OUTPUT) return { text: s.slice(0, MAX_OUTPUT), truncated: true }
+  return { text: s, truncated: false }
+}
+
 function execWithTimeout(cmd, args, opts, timeoutMs, stdin) {
   return new Promise((resolve) => {
     const child = execFile(cmd, args, {
@@ -81,10 +93,16 @@ function execWithTimeout(cmd, args, opts, timeoutMs, stdin) {
     child.stdout?.on('data', (data) => { stdout += data })
     child.stderr?.on('data', (data) => { stderr += data })
 
+    let timer = null
+    let forceTimer = null
     const settle = (result) => {
       if (settled) return
       settled = true
-      resolve(result)
+      if (timer) clearTimeout(timer)
+      if (forceTimer) clearTimeout(forceTimer)
+      // stdout 超 256KB 截断（DB schema 不变，截断后仅用于比对/返回）
+      const t = truncOutput(result.stdout)
+      resolve({ ...result, stdout: t.text, truncated: t.truncated })
     }
 
     child.on('error', (err) => {
@@ -98,7 +116,8 @@ function execWithTimeout(cmd, args, opts, timeoutMs, stdin) {
     // 超时控制：Windows 用 taskkill 杀进程树，Unix 用 SIGKILL。
     // 杀进程失败（如权限问题）时也要兜底 resolve，避免判卷流程永久卡死；
     // 残留的孤儿进程由操作系统回收，判卷结果按超时处理。
-    setTimeout(() => {
+    // 成功/失败都要 clearTimeout：timer id 保存并在 settle 时 clear，避免句柄泄漏。
+    timer = setTimeout(() => {
       if (settled) return
       timedOut = true
       try {
@@ -109,7 +128,7 @@ function execWithTimeout(cmd, args, opts, timeoutMs, stdin) {
         }
       } catch {}
       // kill 后给 close 事件留一点时间回传已收集的输出；仍未退出则强制结算
-      setTimeout(() => {
+      forceTimer = setTimeout(() => {
         settle({ ok: false, stdout, stderr: stderr + '\n[executor] 进程超时且未能终止', timedOut: true, exitCode: -1 })
       }, 2000)
     }, timeoutMs)
@@ -166,13 +185,17 @@ async function executeCode(language, code, stdin, timeLimitMs) {
     let runCmd, runArgs
     if (language === 'python') {
       runCmd = compiler  // python3 路径
-      runArgs = ['solution.py']
+      runArgs = ['-I', '-u', 'solution.py']
     } else {
-      // C: 运行编译出的可执行文件
-      if (process.platform === 'win32') {
-        runCmd = path.join(tmpDir, 'solution.exe')
+      // C: 运行编译出的可执行文件，探测 solution.exe / solution 两个名字
+      const exeWin = path.join(tmpDir, 'solution.exe')
+      const exeUnix = path.join(tmpDir, 'solution')
+      if (fs.existsSync(exeWin)) {
+        runCmd = exeWin
+      } else if (fs.existsSync(exeUnix)) {
+        runCmd = exeUnix
       } else {
-        runCmd = path.join(tmpDir, 'solution')
+        return { status: 'compile_error', error: '编译产物缺失（solution.exe/solution 均不存在）' }
       }
       runArgs = []
     }
@@ -191,6 +214,7 @@ async function executeCode(language, code, stdin, timeLimitMs) {
       stderr: runResult.stderr,
       exitCode: runResult.exitCode,
       timedOut: runResult.timedOut,
+      truncated: !!runResult.truncated,
     }
   } catch (err) {
     return { status: 'error', error: err.message }

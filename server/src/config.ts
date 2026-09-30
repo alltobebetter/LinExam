@@ -13,17 +13,29 @@ function resolveProblemsDir(): string {
 
 export const config = {
   // 服务端口
-  PORT: Number(process.env.PORT || 3000),
+  PORT: (() => {
+    const n = Number(process.env.PORT || 3000)
+    return Number.isFinite(n) && n >= 0 ? n : 3000
+  })(),
 
-  // 数据库路径
-  DB_PATH: process.env.DB_PATH || './data/linexam.db',
+  // 数据库路径（resolve 为绝对路径，避免 cwd 变化导致读写错位）
+  DB_PATH: path.resolve(process.env.DB_PATH || './data/linexam.db'),
 
-  // 登录令牌有效期（秒）
-  TOKEN_TTL: 12 * 60 * 60,
+  // 登录令牌有效期（秒，可用环境变量覆盖）
+  TOKEN_TTL: (() => {
+    const n = Number(process.env.TOKEN_TTL || 12 * 3600)
+    return Number.isFinite(n) && n > 0 ? n : 12 * 3600
+  })(),
 
-  // 登录限流：同一 IP 连续失败达上限后锁定一段时间
-  LOGIN_MAX_FAILURES: Number(process.env.LOGIN_MAX_FAILURES || 10),
-  LOGIN_LOCKOUT_SECONDS: Number(process.env.LOGIN_LOCKOUT_SECONDS || 300),
+  // 登录限流：同一维度连续失败达上限后锁定一段时间
+  LOGIN_MAX_FAILURES: (() => {
+    const n = Number(process.env.LOGIN_MAX_FAILURES || 10)
+    return Number.isFinite(n) && n > 0 ? n : 10
+  })(),
+  LOGIN_LOCKOUT_SECONDS: (() => {
+    const n = Number(process.env.LOGIN_LOCKOUT_SECONDS || 300)
+    return Number.isFinite(n) && n > 0 ? n : 300
+  })(),
 
   // 题库目录（真实题库在 problems-local，仓库内只提交示例题库）
   PROBLEMS_DIR: resolveProblemsDir(),

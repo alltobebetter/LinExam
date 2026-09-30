@@ -13,6 +13,9 @@ const db = new DatabaseSync(config.DB_PATH)
 
 // 开启 WAL 模式（更好的并发读写）
 db.exec('PRAGMA journal_mode = WAL')
+db.exec('PRAGMA busy_timeout = 5000')
+db.exec('PRAGMA foreign_keys = ON')
+db.exec('PRAGMA synchronous = NORMAL')
 
 // 老库升级：补齐 allowed / language 列
 try {
@@ -102,6 +105,19 @@ db.exec(`
     reported_at       INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     FOREIGN KEY (student_id) REFERENCES students(id)
   );
+
+  -- 登录会话（DB 持久化，服务重启后令牌仍有效；过期由定时 sweep 清理）
+  CREATE TABLE IF NOT EXISTS sessions (
+    token       TEXT PRIMARY KEY,
+    student_id  TEXT NOT NULL,
+    name        TEXT,
+    language    TEXT,
+    created_at  INTEGER,
+    expires_at  INTEGER
+  );
+
+  -- 提交查询加速（按学生+题目查卷）
+  CREATE INDEX IF NOT EXISTS idx_submissions_student_problem ON submissions(student_id, problem_id);
 `)
 
 export default db

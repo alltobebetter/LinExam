@@ -9,11 +9,19 @@ let examRecord = null
 let focusLossCount = 0
 let isMonitoring = false
 let blurTime = 0   // 当前离焦开始时间（0 = 未离焦）
+let powerMonitorBound = false  // 全局guard：防止重复绑定powerMonitor
 
 /**
  * 初始化考试行为记录
  */
 function startExamMonitoring(studentId, studentName) {
+  // 同人重复启动忽略；换人则重置（login 未交卷切账号时旧记录不再归属新人）
+  if (isMonitoring && examRecord) {
+    if (examRecord.studentId === studentId) {
+      console.log('[防作弊] 已在监控，忽略重复启动')
+      return
+    }
+  }
   examRecord = {
     studentId,
     studentName,
@@ -43,9 +51,10 @@ function stopExamMonitoring() {
  * 绑定窗口事件（在 createWindow 后调用）
  */
 function bindWindowEvents(mainWindow) {
-  // 窗口失焦：只记录时间，不计次（等回焦时按时长判定）
+  // 窗口失焦：只记录时间，不计次（结算统一在 focus 处，避免一次离席记两次）
   mainWindow.on('blur', () => {
     if (!isMonitoring || !examRecord) return
+    if (blurTime > 0) return
     blurTime = Date.now()
   })
 
@@ -66,24 +75,27 @@ function bindWindowEvents(mainWindow) {
     }
   })
 
-  // 系统级：电源事件（睡眠/唤醒）
-  powerMonitor.on('resume', () => {
-    if (!isMonitoring || !examRecord) return
-    examRecord.violations.push({
-      time: Date.now(),
-      type: 'system_resume',
-      message: '系统从睡眠中恢复',
+  // 系统级：电源事件（睡眠/唤醒），全局只绑一次
+  if (!powerMonitorBound) {
+    powerMonitorBound = true
+    powerMonitor.on('resume', () => {
+      if (!isMonitoring || !examRecord) return
+      examRecord.violations.push({
+        time: Date.now(),
+        type: 'system_resume',
+        message: '系统从睡眠中恢复',
+      })
     })
-  })
 
-  powerMonitor.on('suspend', () => {
-    if (!isMonitoring || !examRecord) return
-    examRecord.violations.push({
-      time: Date.now(),
-      type: 'system_suspend',
-      message: '系统进入睡眠',
+    powerMonitor.on('suspend', () => {
+      if (!isMonitoring || !examRecord) return
+      examRecord.violations.push({
+        time: Date.now(),
+        type: 'system_suspend',
+        message: '系统进入睡眠',
+      })
     })
-  })
+  }
 }
 
 /**
@@ -103,7 +115,7 @@ function getBehaviorSummary() {
     focusLossCount,
     focusLossEvents: examRecord.focusLossEvents,
     violations: examRecord.violations,
-    duration: Date.now() - examRecord.startTime,
+    duration: (examRecord.endTime || Date.now()) - examRecord.startTime,
     level,
   }
 }
@@ -112,4 +124,5 @@ module.exports = {
   startExamMonitoring,
   stopExamMonitoring,
   bindWindowEvents,
+  getBehaviorSummary,
 }

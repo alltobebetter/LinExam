@@ -22,7 +22,7 @@ const casesPath = path.resolve(
 )
 const DEFAULT_TIME_LIMIT = 5000
 
-const normalize = (s) => (s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+const normalize = (s) => (s || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
 
 async function main() {
   if (!fs.existsSync(dbPath)) {
@@ -37,7 +37,8 @@ async function main() {
   const cases = JSON.parse(fs.readFileSync(casesPath, 'utf-8'))
   const db = new DatabaseSync(dbPath)
 
-  // 每生每题只取最后一次提交（id 最大），其余待判旧提交标记为 superseded，不参与判卷与总分
+  // 每生每题只取最后一次待判提交（id 最大，仅 pending），其余待判旧提交标记 superseded。
+  // 注意：只动 pending 行，已判的 pass/fail 绝不覆盖（可重复执行）；汇总时再按每组 MAX(id) 去重防双计。
   const superseded = db.prepare(`
     UPDATE submissions SET status = 'superseded', judged_at = strftime('%s','now')
     WHERE status = 'pending' AND id NOT IN (
@@ -64,6 +65,7 @@ async function main() {
   for (const row of rows) {
     const problem = cases[String(row.problem_id)]
     if (!problem) {
+      // 未知题保持 pending 跳过（不回写 error，避免污染汇总 total 口径），下次配好用例再判
       console.error(`[跳过] id=${row.id} 未知题目 ${row.problem_id}`)
       continue
     }
@@ -71,16 +73,30 @@ async function main() {
     let passed = 0
     let status = 'fail'
 
-    if (row.language !== 'c' && row.language !== 'python') {
+    if (!allCases.length) {
+      status = 'error'
+    } else if (row.language !== 'c' && row.language !== 'python') {
       status = 'error'
     } else {
       let broken = false
       for (const tc of allCases) {
         // 注意：当前无内存限制（见 executor.js 说明），仅时间限制兜底
-        const result = await executeCode(row.language, row.code, tc.input, DEFAULT_TIME_LIMIT)
+        // 用例级 timeLimit 优先，其次题目级，最后默认值
+        const limit = tc.timeLimit ?? problem.timeLimit ?? DEFAULT_TIME_LIMIT
+        const result = await executeCode(row.language, row.code, tc.input, limit)
         if (result.status === 'compile_error') {
           status = 'compile_error'
           passed = 0
+          broken = true
+          break
+        }
+        if (result.status === 'timeout') {
+          status = 'timeout'
+          broken = true
+          break
+        }
+        if (result.status === 'runtime_error') {
+          status = 'runtime_error'
           broken = true
           break
         }
@@ -104,11 +120,15 @@ async function main() {
     console.log(`[${done}/${rows.length}] id=${row.id} ${row.student_id} 题${row.problem_id} ${row.language} → ${status} ${passed}/${allCases.length} 分${score}`)
   }
 
-  // 汇总：每行已是每生每题的最后一次提交，直接按学生求和即为最终成绩
-  // （状态枚举与判卷写入一致：pass / fail / compile_error / error）
+  // 汇总：每生每题以最后一次提交为准（内层 MAX 取 id 最大，外层只统计已判状态）
+  // （状态枚举与判卷写入一致：pass / fail / compile_error / error / timeout / runtime_error）
   const summary = db.prepare(`
     SELECT student_id, COUNT(*) AS total, SUM(score) AS sum_score
-    FROM submissions WHERE status IN ('pass', 'fail', 'compile_error', 'error')
+    FROM submissions WHERE id IN (
+      SELECT MAX(id) FROM submissions
+      WHERE status IN ('pass', 'fail', 'compile_error', 'error', 'timeout', 'runtime_error')
+      GROUP BY student_id, problem_id
+    )
     GROUP BY student_id ORDER BY sum_score DESC
   `).all()
   console.log('\n── 总分汇总（每生每题以最后一次提交为准）──')

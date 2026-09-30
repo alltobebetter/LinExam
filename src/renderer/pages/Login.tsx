@@ -120,6 +120,7 @@ export default function Login() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (loading) return
 
     if (!name.trim()) {
       toast.show('请输入姓名', 'warning')
@@ -135,26 +136,39 @@ export default function Login() {
     }
 
     setLoading(true)
-
-    // 在线验证登录（服务端地址由登录页传入，主进程校验题库指纹）
-    const result = await window.exampower?.login(name.trim(), studentId.trim(), serverUrl.trim())
-
-    if (!result?.ok) {
-      toast.show(result?.error || '登录失败，请重试', 'error')
-      setLoading(false)
-      return
-    }
-
-    // 登录成功后记住服务器地址，下次自动带出
     try {
-      localStorage.setItem(SERVER_URL_KEY, serverUrl.trim())
-    } catch { /* 忽略存储失败 */ }
+      // 在线验证登录（服务端地址由登录页传入，主进程校验题库指纹）
+      const result = await window.exampower?.login(name.trim(), studentId.trim(), serverUrl.trim())
 
-    // 启动防作弊监控
-    await window.exampower?.startMonitoring(studentId.trim(), name.trim())
+      if (!result?.ok) {
+        toast.show(result?.error || '登录失败，请重试', 'error')
+        return
+      }
 
-    toast.show('登录成功，欢迎进入考试', 'success')
-    navigate('/exam')
+      // 登录成功后记住服务器地址，下次自动带出
+      try {
+        localStorage.setItem(SERVER_URL_KEY, serverUrl.trim())
+      } catch { /* 忽略存储失败 */ }
+
+      // 启动防作弊监控
+      try {
+        const mon = await window.exampower?.startMonitoring(studentId.trim(), name.trim())
+        if (!mon?.ok) {
+          toast.show('启动监控失败，请重试', 'error')
+          return
+        }
+      } catch {
+        toast.show('启动监控失败，请重试', 'error')
+        return
+      }
+
+      toast.show('登录成功，欢迎进入考试', 'success')
+      navigate('/exam')
+    } catch {
+      toast.show('登录失败，请重试', 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

@@ -10,9 +10,10 @@ const students = [
 ]
 
 function seed() {
+  // 已存在的行只更新 name/language，不碰 allowed（保持禁考状态不被覆盖）
   const stmt = db.prepare(`
     INSERT INTO students (id, name, allowed, language) VALUES (?, ?, 1, ?)
-    ON CONFLICT(id) DO UPDATE SET name = excluded.name, allowed = 1, language = excluded.language
+    ON CONFLICT(id) DO UPDATE SET name = excluded.name, language = excluded.language
   `)
 
   for (const s of students) {
@@ -24,6 +25,7 @@ function seed() {
     console.log(`   ${s.id}  ${s.name}  ${s.language}`)
   }
   console.log('登录时请使用上述 姓名 + 学号 组合。')
+  console.log('注意：重跑 seed 不会恢复 allowed=0（禁考），需手动 UPDATE students SET allowed=1。')
 }
 
 seed()

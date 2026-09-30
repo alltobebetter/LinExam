@@ -22,9 +22,9 @@ export interface ExamProblem {
   hash: string
 }
 
-/** 题面换行归一化：统一为 \n，消除 Windows/Linux 检出差异导致的指纹漂移 */
+/** 题面换行归一化：去 BOM + 统一为 \n，消除 Windows/Linux 检出差异导致的指纹漂移（与 gen 脚本/客户端一致） */
 function normalize(text: string): string {
-  return text.replace(/\r\n/g, '\n')
+  return text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 }
 
 export function problemFingerprint(p: {

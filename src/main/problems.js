@@ -19,7 +19,7 @@ const crypto = require('crypto')
 const manifestFile = path.join(__dirname, 'problems', 'manifest.json')
 
 function normalize(text) {
-  return String(text ?? '').replace(/\r\n/g, '\n')
+  return String(text ?? '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 }
 
 /** 用收到的题目内容本地重算指纹（不信任服务端算的） */
