@@ -179,6 +179,12 @@ app.post('/api/login', (req, res) => {
     return res.status(403).json({ error: '尚未选择考试语言，请先前往选语言页面选择（每人仅一次）' })
   }
 
+  // 已交卷：禁止再次登录（客户端本地锁只是辅助，换机/清数据即失效，以服务端为准）
+  const finished = db.prepare('SELECT 1 FROM finishes WHERE student_id = ?').get(trimmedId)
+  if (finished) {
+    return res.status(403).json({ error: '已交卷，无法再次登录' })
+  }
+
   clearLoginFailures(rateKey)
 
   const language = student.language
