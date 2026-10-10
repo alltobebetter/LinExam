@@ -1,0 +1,58 @@
+{
+  "problems": [
+    {
+      "id": 1,
+      "hash": "b445d7bdfb52a93f486af47397596ec9925f982bc53da4fd028be9eac50cad5a"
+    },
+    {
+      "id": 2,
+      "hash": "8ac673ecff401273e9e6c643421a3544fe1151b5a839db650643bffa3d11f6ec"
+    },
+    {
+      "id": 3,
+      "hash": "62febc27f9ff261ae95a6b90c67061ecfc4759c086323b4249609e08d6050a87"
+    },
+    {
+      "id": 4,
+      "hash": "85f1a543067a7336ac8f6b20eaad1bedf710f2c30c9c347518999bb7ee5d6005"
+    },
+    {
+      "id": 5,
+      "hash": "c5a3d316aeeec86ee7223bfef61482e0e0a63547413a881835316ab79ab40878"
+    },
+    {
+      "id": 6,
+      "hash": "d12228e54e9925ef4c38c115b5a237bbaed15b3eb889492adfbc3a93521d1d2b"
+    },
+    {
+      "id": 7,
+      "hash": "5b86a2f7882613338bb8b8f9f089e572ce013f70df922679e10b6c6061fd49fd"
+    },
+    {
+      "id": 8,
+      "hash": "c2dcdbf5b481ad62fbf7473fcb5fefba85814387032ea1b46e3ae42edf7ccb41"
+    },
+    {
+      "id": 9,
+      "hash": "e993b1a53a2fb84c2079895b7f26caccf880769c5b4b5ac7fc4e2be744684d85"
+    },
+    {
+      "id": 10,
+      "hash": "3012b3f6c171d7b053e418f30612a10ddb37f10ab275ea2972629700f8f4b11d"
+    },
+    {
+      "id": 11,
+      "hash": "e75342e128821acd7259123f65141e4b803f58582fdeaa92f61d0caa23177da1"
+    },
+    {
+      "id": 12,
+      "hash": "c207d845a4b22b23edc5d81bc0cf86c58030e292764815ed34f46583621163b6"
+    }
+  ],
+  "manifestHash": "57f9f9c2d5d48813ff88c2b7ec20f544d1f78bf7de4870dca08a85283ad0e873",
+  "meta": {
+    "source": "server\\problems-local",
+    "builtAt": "2026-10-10T12:46:43.210Z",
+    "gitRev": "37c9e2754e97ea0e8a7f8e3f95bb26dd830bb1db"
+  }
+}

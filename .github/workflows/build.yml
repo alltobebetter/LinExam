@@ -1,5 +1,9 @@
 name: Build & Release
 # 由 GitHub Actions 消费：推 v* 标签或手动触发三平台打包
+#
+# 指纹清单说明：客户端校验用的 src/main/problems/manifest.json（仅 sha256，不含题面）
+# 已入库，CI 直接使用，不再运行 gen:manifest（CI 无真题库，重生成会回退成示例题，
+# 导致安装包与真题服务器题量不符而无法登录）。换题后本地重跑 gen:manifest 再提交。
 
 # 触发：推送 v* 标签（正式发版）或手动触发（Actions 页面点按钮）
 # 注意私有仓库分钟数倍率：Linux 1x / Windows 2x / macOS 10x，
@@ -22,17 +26,17 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            script: build:win
+            pkg: --win
             artifacts: |
               dist/*.exe
               dist/*.blockmap
           - os: macos-latest
-            script: build:mac
+            pkg: --mac
             artifacts: |
               dist/*.dmg
               dist/*.zip
           - os: ubuntu-latest
-            script: build:linux
+            pkg: --linux
             artifacts: |
               dist/*.AppImage
               dist/*.deb
@@ -52,8 +56,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run ${{ matrix.script }}
+      - name: Check problem manifest
+        run: node -e "const m=require('./src/main/problems/manifest.json');console.log('指纹清单:',m.problems.length,'题 manifestHash='+m.manifestHash);if(!m.problems.length)throw new Error('manifest empty')"
+
+      - name: Build web
+        run: npm run build:web
+
+      - name: Package
+        run: npx electron-builder ${{ matrix.pkg }} -c electron-builder.config.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

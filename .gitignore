@@ -31,12 +31,13 @@ Desktop.ini
 *~
 
 # 本地真实题库/判卷用例/校验工具（公开仓库只含示例集，标准解不入库）
+# 注意：src/main/problems/manifest.json 是真题指纹清单（仅 sha256，不含题面），
+# 必须入库，CI 打包直接用它，不再重新生成（CI 无真题库，重生成会回退成示例题）。
 server/problems-local/
 server/roster.json
 cases-local/
 cases/full.json
 scripts-local/
-src/main/problems/manifest.json
 # 真实报名名册（含手机号，不入库）
 306报名名册.xlsx
 
