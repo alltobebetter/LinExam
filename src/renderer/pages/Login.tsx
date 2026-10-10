@@ -125,7 +125,7 @@ export default function Login() {
       return
     }
     if (!studentId.trim()) {
-      toast.show('请输入学号', 'warning')
+      toast.show('请输入手机号', 'warning')
       return
     }
     if (!serverUrl.trim()) {
@@ -241,7 +241,7 @@ export default function Login() {
             <IconInput
               value={studentId}
               onChange={setStudentId}
-              label="学号"
+              label="手机号"
               icon={idCardIcon}
             />
 
@@ -289,7 +289,7 @@ export default function Login() {
           </section>
           <section>
             <h3 className="text-[14px] font-bold text-slate-800 dark:text-slate-100 mb-2">二、用户注册与登录</h3>
-            <p>用户需使用真实姓名和学号登录本平台。用户应确保所提供的信息真实、准确，因提供虚假信息所导致的一切后果由用户自行承担。</p>
+            <p>用户需使用真实姓名和手机号登录本平台。用户应确保所提供的信息真实、准确，因提供虚假信息所导致的一切后果由用户自行承担。</p>
           </section>
           <section>
             <h3 className="text-[14px] font-bold text-slate-800 dark:text-slate-100 mb-2">三、用户行为规范</h3>
@@ -327,7 +327,7 @@ export default function Login() {
             <h3 className="text-[14px] font-bold text-slate-800 dark:text-slate-100 mb-2">一、信息收集</h3>
             <p>本平台在您使用过程中会收集以下信息：</p>
             <ul className="ml-4 space-y-1 mt-2">
-              <li>· <span className="font-medium">姓名与学号</span>：用于身份验证和考试记录；</li>
+              <li>· <span className="font-medium">姓名与手机号</span>：用于身份验证和考试记录；</li>
               <li>· <span className="font-medium">代码提交记录</span>：用于评测和存档；</li>
               <li>· <span className="font-medium">设备信息</span>：包括操作系统类型，用于兼容性保障。</li>
             </ul>

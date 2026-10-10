@@ -32,10 +32,13 @@ Desktop.ini
 
 # 本地真实题库/判卷用例/校验工具（公开仓库只含示例集，标准解不入库）
 server/problems-local/
+server/roster.json
 cases-local/
 cases/full.json
 scripts-local/
 src/main/problems/manifest.json
+# 真实报名名册（含手机号，不入库）
+306报名名册.xlsx
 
 # 展示站独立成库（LinExamWeb），不随主仓库推送
 site/

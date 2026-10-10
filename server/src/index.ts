@@ -4,6 +4,7 @@ import { config } from './config'
 import { authMiddleware, issueToken, startSweep } from './auth'
 import db from './db'
 import { loadProblems, manifestFingerprint } from './problems'
+import { SELECT_PAGE_HTML } from './select-page'
 
 const app = express()
 
@@ -11,8 +12,8 @@ const app = express()
 startSweep()
 
 // ── 登录限流（极简内存实现）──
-// 限流键为 ip + 学号双维度（小写归一），防止同一出口 IP 下一人失败牵连他人，
-// 也防止针对单个学号的暴力枚举。另带 10 分钟滑动窗口：窗口过期自动重置计数。
+// 限流键为 ip + 手机号双维度（小写归一），防止同一出口 IP 下一人失败牵连他人，
+// 也防止针对单个手机号的暴力枚举。另带 10 分钟滑动窗口：窗口过期自动重置计数。
 // 注意：多考点共用出口 IP 时仍需按需放宽阈值。
 interface LoginFailure {
   count: number
@@ -142,14 +143,15 @@ app.get('/health', (_req, res) => {
 })
 
 // ── 登录 ──
-// 校验学生是否在考试名单中（allowed=1），姓名和学号必须匹配。
+// 校验学生是否在考试名单中（allowed=1），姓名和手机号必须匹配。
+// 登录 ID 即报名手机号；考试语言须已在 /select 选定（language 为空=未选，拒绝登录）。
 app.post('/api/login', (req, res) => {
   const ip = req.ip || 'unknown'
 
   const { name, studentId } = req.body
 
   if (typeof name !== 'string' || typeof studentId !== 'string' || !name?.trim() || !studentId?.trim()) {
-    return res.status(400).json({ error: '请输入姓名和学号' })
+    return res.status(400).json({ error: '请输入姓名和手机号' })
   }
 
   const trimmedId = studentId.trim()
@@ -165,16 +167,21 @@ app.post('/api/login', (req, res) => {
     'SELECT id, name, allowed, language FROM students WHERE id = ?'
   ).get(trimmedId) as { id: string; name: string; allowed: number; language: string } | undefined
 
-  // 统一文案防枚举：不在名单 / 被禁考 / 姓名不匹配一律同错；日志只记学号
+  // 统一文案防枚举：不在名单 / 被禁考 / 姓名不匹配一律同错；日志只记手机号
   if (!student || student.allowed !== 1 || student.name !== trimmedName) {
     recordLoginFailure(rateKey)
-    console.error(`[登录失败] 学号 ${trimmedId} 登录失败`)
-    return res.status(403).json({ error: '姓名与学号不匹配，请核对后重试' })
+    console.error(`[登录失败] 手机号 ${trimmedId} 登录失败`)
+    return res.status(403).json({ error: '姓名与手机号不匹配，请核对后重试' })
+  }
+
+  // 未选语言：引导先去选语言页（每人仅一次），不签发令牌
+  if (student.language !== 'c' && student.language !== 'python') {
+    return res.status(403).json({ error: '尚未选择考试语言，请先前往选语言页面选择（每人仅一次）' })
   }
 
   clearLoginFailures(rateKey)
 
-  const language = student.language === 'python' ? 'python' : 'c'
+  const language = student.language
   const token = issueToken(trimmedId, trimmedName, language)
 
   res.json({
@@ -184,6 +191,51 @@ app.post('/api/login', (req, res) => {
     language,
     expiresIn: config.TOKEN_TTL,
   })
+})
+
+// ── 考前选语言页（无需令牌，现场手机/电脑访问）──
+app.get('/select', (_req, res) => {
+  res.type('html').send(SELECT_PAGE_HTML)
+})
+
+// ── 提交语言选择（无需令牌，每人仅一次，选定后锁定）──
+app.post('/api/select-language', (req, res) => {
+  const ip = req.ip || 'unknown'
+  const { name, studentId, language } = req.body
+
+  if (typeof name !== 'string' || typeof studentId !== 'string' || !name?.trim() || !studentId?.trim()) {
+    return res.status(400).json({ error: '请输入姓名和手机号' })
+  }
+  if (language !== 'c' && language !== 'python') {
+    return res.status(400).json({ error: '请选择考试语言（C 或 Python）' })
+  }
+
+  const trimmedId = (studentId as string).trim()
+  const trimmedName = (name as string).trim()
+  const rateKey = loginKey(ip, trimmedId)
+
+  if (isLoginLocked(rateKey)) {
+    return res.status(429).json({ error: '尝试次数过多，请稍后再试' })
+  }
+
+  const student = db.prepare(
+    'SELECT id, name, allowed, language FROM students WHERE id = ?'
+  ).get(trimmedId) as { id: string; name: string; allowed: number; language: string } | undefined
+
+  // 统一文案防枚举：不在名单 / 被禁考 / 姓名不匹配一律同错
+  if (!student || student.allowed !== 1 || student.name !== trimmedName) {
+    recordLoginFailure(rateKey)
+    return res.status(403).json({ error: '姓名与手机号不匹配，请核对后重试' })
+  }
+
+  // 已选则锁定，不可更改
+  if (student.language === 'c' || student.language === 'python') {
+    return res.status(403).json({ error: '已选择过考试语言，不可更改' })
+  }
+
+  db.prepare('UPDATE students SET language = ? WHERE id = ?').run(language, trimmedId)
+  clearLoginFailures(rateKey)
+  res.json({ ok: true, language })
 })
 
 // ── 以下接口都需要令牌 ──

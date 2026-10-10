@@ -732,7 +732,7 @@ export default function Exam() {
               </div>
               <div className="flex items-start gap-2">
                 <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">考试语言</span>
-                <span>由监考老师按学号分配（C / Python），登录后自动确定，不可切换</span>
+                <span>开考前自行选择（C / Python），每人仅一次，登录后自动确定，不可切换</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">❓ 帮助</span>
@@ -751,7 +751,7 @@ export default function Exam() {
             </h3>
             <ol className="ml-4 space-y-1.5 list-decimal">
               <li>在左侧题目描述区阅读题目要求和示例</li>
-              <li>在右侧编辑器中编写代码（语言已按学号分配好）</li>
+              <li>在右侧编辑器中编写代码（语言已在考前选定）</li>
               <li>点击「提交」按钮上传代码，可在「提交记录」中查看历次提交</li>
               <li>考后统一判卷，考试期间不显示分数</li>
             </ol>

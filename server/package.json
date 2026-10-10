@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "seed": "tsx src/seed.ts",
+    "import": "tsx src/import.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

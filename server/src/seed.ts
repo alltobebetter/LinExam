@@ -1,7 +1,9 @@
 import db from './db'
 
 // ── 测试学生名单 ──
-// 登录时服务端会校验：姓名 + 学号 必须匹配名单中的某一行，且 allowed=1。
+// 登录时服务端会校验：姓名 + 手机号 必须匹配名单中的某一行，且 allowed=1。
+// 真实考生用 `npm run import` 从 roster.json（本地生成，不入库）导入，
+// 新行 language 为空=待选语言，考生先到 GET /select 选一次语言再登录。
 // 想增删学生，编辑这个数组后重新运行 `npm run seed`。
 const students = [
   { id: '20260001', name: '张三', language: 'c' },
@@ -24,7 +26,7 @@ function seed() {
   for (const s of students) {
     console.log(`   ${s.id}  ${s.name}  ${s.language}`)
   }
-  console.log('登录时请使用上述 姓名 + 学号 组合。')
+  console.log('登录时请使用上述 姓名 + 手机号 组合。')
   console.log('注意：重跑 seed 不会恢复 allowed=0（禁考），需手动 UPDATE students SET allowed=1。')
 }
 
