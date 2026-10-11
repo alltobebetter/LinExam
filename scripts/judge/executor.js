@@ -79,8 +79,15 @@ function execWithTimeout(cmd, args, opts, timeoutMs, stdin) {
     let settled = false
 
     if (stdin && child.stdin) {
-      child.stdin.write(stdin)
-      child.stdin.end()
+      // 子进程若瞬间退出（如根本不读 stdin），write 会触发 EPIPE：
+      // 必须挂 error 兜底，否则未捕获异常直接杀死整个判卷进程
+      child.stdin.on('error', () => {})
+      try {
+        child.stdin.write(stdin)
+      } catch {}
+      try {
+        child.stdin.end()
+      } catch {}
     }
 
     child.stdout?.on('data', (data) => { stdout += data })
